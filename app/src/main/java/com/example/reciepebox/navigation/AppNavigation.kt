@@ -1,195 +1,100 @@
 package com.example.reciepebox.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.reciepebox.data.sampleRecipes
+import com.example.reciepebox.data.RecipeRepository
+import com.example.reciepebox.data.RecipeStore
+import com.example.reciepebox.ui.CreateEditRecipeScreen
+import com.example.reciepebox.ui.FavouritesScreen
+import com.example.reciepebox.ui.RecipeDetailsScreen
+import com.example.reciepebox.ui.RecipeFeedScreen
+import com.example.reciepebox.ui.ShoppingListScreen
 
-import com.example.reciepebox.screens.home.HomeScreen
-import com.example.reciepebox.screens.home.create.CreateRecipeScreen
-import com.example.reciepebox.screens.home.detail.RecipeDetailScreen
-import com.example.reciepebox.screens.home.favorites.FavoritesScreen
-import com.example.reciepebox.screens.home.shopping.ShoppingListScreen
+object Routes {
+    const val FEED = "feed"
+    const val FAVOURITES = "favourites"
+    const val SHOPPING = "shopping"
+    const val CREATE = "create"
+    const val EDIT = "edit/{id}"
+    const val DETAILS = "details/{id}"
 
+    fun edit(id: Int) = "edit/$id"
+    fun details(id: Int) = "details/$id"
+}
 
 @Composable
 fun AppNavigation() {
-
     val navController = rememberNavController()
-
-    var recipes by remember {
-        mutableStateOf(sampleRecipes)
-    }
-
-    var shoppingItems by remember {
-        mutableStateOf(emptyList<String>())
-    }
+    val store = remember { RecipeStore() }
+    val repository = remember { RecipeRepository() }
 
     NavHost(
         navController = navController,
-        startDestination = "home"
+        startDestination = Routes.FEED
     ) {
-
-        // HOME
-        composable("home") {
-
-            HomeScreen(
-                recipes = recipes,
-
-                onRecipeClick = { id ->
-                    navController.navigate("detail/$id")
-                },
-
-                onFavorite = { id ->
-
-                    recipes = recipes.map { recipe ->
-
-                        if (recipe.id == id) {
-                            recipe.copy(
-                                favorite = !recipe.favorite
-                            )
-                        } else {
-                            recipe
-                        }
-                    }
-                },
-
-                onShoppingClick = {
-                    navController.navigate("shopping")
-                },
-
-                onFavoritesClick = {
-                    navController.navigate("favorites")
-                },
-
-                onCreateClick = {
-                    navController.navigate("create")
-                }
+        composable(Routes.FEED) {
+            RecipeFeedScreen(
+                store = store,
+                repository = repository,
+                onDetails = { navController.navigate(Routes.details(it)) },
+                onCreate = { navController.navigate(Routes.CREATE) },
+                onFavourites = { navController.navigate(Routes.FAVOURITES) },
+                onShopping = { navController.navigate(Routes.SHOPPING) }
             )
         }
 
-        // DETAIL
-        composable(
-            route = "detail/{id}",
-            arguments = listOf(
-                navArgument("id") {
-                    type = NavType.IntType
-                }
-            )
-        ) { entry ->
-
-            val id =
-                entry.arguments?.getInt("id") ?: 0
-
-            val recipe =
-                recipes.find {
-                    it.id == id
-                }
-
-            if (recipe != null) {
-
-                RecipeDetailScreen(
-
-                    recipe = recipe,
-
-                    onBack = {
-                        navController.popBackStack()
-                    },
-
-                    onFavorite = {
-
-                        recipes = recipes.map {
-                            if (it.id == id) {
-                                it.copy(
-                                    favorite = !it.favorite
-                                )
-                            } else {
-                                it
-                            }
-                        }
-                    },
-
-                    onAddShopping = {
-
-                        val ingredients =
-                            recipe.ingredients.map {
-                                "${it.amount} ${it.unit} ${it.name}"
-                            }
-
-                        shoppingItems =
-                            (shoppingItems + ingredients)
-                                .distinct()
-                    }
-                )
-            }
-        }
-
-        // FAVORITES
-        composable("favorites") {
-
-            FavoritesScreen(
-
-                recipes = recipes,
-
-                onBack = {
-                    navController.popBackStack()
-                },
-
-                onRecipeClick = { id ->
-                    navController.navigate("detail/$id")
-                },
-
-                onFavorite = { id ->
-
-                    recipes = recipes.map {
-
-                        if (it.id == id) {
-                            it.copy(
-                                favorite = !it.favorite
-                            )
-                        } else {
-                            it
-                        }
-                    }
-                }
+        composable(Routes.FAVOURITES) {
+            FavouritesScreen(
+                store = store,
+                onBack = { navController.popBackStack() },
+                onDetails = { navController.navigate(Routes.details(it)) }
             )
         }
 
-        // SHOPPING
-        composable("shopping") {
-
+        composable(Routes.SHOPPING) {
             ShoppingListScreen(
-
-                items = shoppingItems,
-
-                onBack = {
-                    navController.popBackStack()
-                },
-
-                onRemove = { item ->
-
-                    shoppingItems =
-                        shoppingItems.filter {
-                            it != item
-                        }
-                }
+                store = store,
+                onBack = { navController.popBackStack() }
             )
         }
 
-        // CREATE
-        composable("create") {
+        composable(Routes.CREATE) {
+            CreateEditRecipeScreen(
+                store = store,
+                repository = repository,
+                recipeId = null,
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            CreateRecipeScreen(
-                onBack = {
-                    navController.popBackStack()
-                }
+        composable(
+            route = Routes.EDIT,
+            arguments = listOf(navArgument("id") { type = NavType.IntType })
+        ) { entry ->
+            val id = entry.arguments?.getInt("id") ?: 0
+            CreateEditRecipeScreen(
+                store = store,
+                repository = repository,
+                recipeId = id,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.DETAILS,
+            arguments = listOf(navArgument("id") { type = NavType.IntType })
+        ) { entry ->
+            val id = entry.arguments?.getInt("id") ?: 0
+            RecipeDetailsScreen(
+                store = store,
+                recipeId = id,
+                onBack = { navController.popBackStack() },
+                onEdit = { navController.navigate(Routes.edit(id)) }
             )
         }
     }
